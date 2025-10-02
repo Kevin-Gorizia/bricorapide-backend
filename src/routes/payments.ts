@@ -4,7 +4,7 @@ import { isAuth } from "../middleware/auth";
 import express from "express";
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2022-11-15",
+  apiVersion: "2025-08-27.basil",
 });
 
 router.post("/create-payment-intent", isAuth, async (req: any, res) => {
