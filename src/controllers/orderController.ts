@@ -1,58 +1,51 @@
 import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
-import { ReservationStatus } from "@prisma/client";
+import { asyncHandler } from "../middlewares/asyncHandler";
 
-// Récupérer toutes les réservations
-export const getOrders = async (req: Request, res: Response) => {
-  try {
-    const orders = await prisma.reservation.findMany({
-      include: { user: true },
+// GET all
+export const getReservations = asyncHandler(
+  async (req: Request, res: Response) => {
+    const reservations = await prisma.reservation.findMany({
+      include: { user: true, products: true },
+      orderBy: { createdAt: "desc" },
     });
-    res.json({ success: true, data: orders });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Erreur serveur" });
+    res.json({ success: true, data: reservations });
   }
-};
+);
 
-// Récupérer une réservation par ID
-export const getOrderById = async (req: Request, res: Response) => {
-  try {
+// GET by ID
+export const getReservationById = asyncHandler(
+  async (req: Request, res: Response) => {
     const { id } = req.params;
-    const order = await prisma.reservation.findUnique({
+    const reservation = await prisma.reservation.findUnique({
       where: { id: Number(id) },
-      include: { user: true },
+      include: { user: true, products: true },
     });
-    if (!order)
+    if (!reservation)
       return res
         .status(404)
         .json({ success: false, message: "Réservation non trouvée" });
-    res.json({ success: true, data: order });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: "Erreur serveur" });
+    res.json({ success: true, data: reservation });
   }
-};
+);
 
-// Créer une réservation
-export const createOrder = async (req: Request, res: Response) => {
-  try {
+// CREATE
+export const createReservation = asyncHandler(
+  async (req: any, res: Response) => {
     const {
-      userId,
       nomClient,
       emailClient,
       service,
       surface,
       distanceKm,
       amountCents,
-      status,
-      stripePaymentIntentId,
+      products,
       scheduledAt,
       notes,
-      products,
     } = req.body;
+    const userId = req.userId;
 
-    const order = await prisma.reservation.create({
+    const reservation = await prisma.reservation.create({
       data: {
         userId,
         nomClient,
@@ -61,84 +54,46 @@ export const createOrder = async (req: Request, res: Response) => {
         surface,
         distanceKm,
         amountCents,
-        status: status || ReservationStatus.PENDING,
-        stripePaymentIntentId,
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
-        notes,
-        products: { connect: products.map((p: number) => ({ id: p })) },
-      },
-      include: { products: true, user: true },
-    });
-
-    res.status(201).json({ success: true, data: order });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Erreur lors de la création de la réservation",
-    });
-  }
-};
-
-// Mettre à jour une réservation
-export const updateOrder = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const {
-      nomClient,
-      emailClient,
-      service,
-      surface,
-      distanceKm,
-      amountCents,
-      status,
-      stripePaymentIntentId,
-      scheduledAt,
-      notes,
-      products,
-    } = req.body;
-
-    const order = await prisma.reservation.update({
-      where: { id: Number(id) },
-      data: {
-        nomClient,
-        emailClient,
-        service,
-        surface,
-        distanceKm,
-        amountCents,
-        status,
-        stripePaymentIntentId,
         scheduledAt: scheduledAt ? new Date(scheduledAt) : null,
         notes,
         products: products
-          ? { set: products.map((p: number) => ({ id: p })) }
+          ? { connect: products.map((id: number) => ({ id })) }
           : undefined,
       },
       include: { products: true, user: true },
     });
 
-    res.json({ success: true, data: order });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Erreur lors de la mise à jour de la réservation",
-    });
+    res.status(201).json({ success: true, data: reservation });
   }
-};
+);
 
-// Supprimer une réservation
-export const deleteOrder = async (req: Request, res: Response) => {
-  try {
+// UPDATE
+export const updateReservation = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const data: any = req.body;
+    if (data.scheduledAt) data.scheduledAt = new Date(data.scheduledAt);
+
+    const reservation = await prisma.reservation.update({
+      where: { id: Number(id) },
+      data: {
+        ...data,
+        products: data.products
+          ? { set: data.products.map((id: number) => ({ id })) }
+          : undefined,
+      },
+      include: { products: true, user: true },
+    });
+
+    res.json({ success: true, data: reservation });
+  }
+);
+
+// DELETE
+export const deleteReservation = asyncHandler(
+  async (req: Request, res: Response) => {
     const { id } = req.params;
     await prisma.reservation.delete({ where: { id: Number(id) } });
-    res.json({ success: true, message: "Réservation supprimée avec succès" });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: "Erreur lors de la suppression de la réservation",
-    });
+    res.json({ success: true, message: "Réservation supprimée" });
   }
-};
+);

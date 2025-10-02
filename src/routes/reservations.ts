@@ -1,22 +1,23 @@
-import { Router } from "express";
+import { Router, Response } from "express";
+import { isAuth, AuthRequest } from "../middlewares/auth";
+import { asyncHandler } from "../middlewares/asyncHandler";
 import { prisma } from "../lib/prisma";
-import { isAuth } from "../middleware/auth";
+
 const router = Router();
 
-router.post("/", isAuth, async (req: any, res) => {
-  const userId = req.userId;
-  const {
-    nomClient,
-    emailClient,
-    service,
-    surface,
-    distanceKm,
-    amountCents,
-    stripePaymentIntentId,
-  } = req.body;
-  const created = await prisma.reservation.create({
-    data: {
-      userId,
+// Créer une réservation
+router.post(
+  "/",
+  isAuth,
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const userId = req.userId;
+    if (!userId) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Utilisateur non authentifié" });
+    }
+
+    const {
       nomClient,
       emailClient,
       service,
@@ -24,16 +25,41 @@ router.post("/", isAuth, async (req: any, res) => {
       distanceKm,
       amountCents,
       stripePaymentIntentId,
-    },
-  });
-  res.json(created);
-});
+      products,
+    } = req.body;
 
-router.get("/", isAuth, async (req: any, res) => {
-  const list = await prisma.reservation.findMany({
-    orderBy: { createdAt: "desc" },
-  });
-  res.json(list);
-});
+    const reservation = await prisma.reservation.create({
+      data: {
+        user: { connect: { id: userId } }, // ✅ obligatoire pour Prisma
+        nomClient,
+        emailClient,
+        service,
+        surface,
+        distanceKm,
+        amountCents,
+        stripePaymentIntentId,
+        products: products
+          ? { connect: products.map((id: number) => ({ id })) }
+          : undefined,
+      },
+      include: { products: true, user: true },
+    });
+
+    res.json({ success: true, data: reservation });
+  })
+);
+
+// Récupérer toutes les réservations
+router.get(
+  "/",
+  isAuth,
+  asyncHandler(async (req: import("express").Request, res: Response) => {
+    const reservations = await prisma.reservation.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { products: true, user: true },
+    });
+    res.json({ success: true, data: reservations });
+  })
+);
 
 export default router;
