@@ -1,10 +1,22 @@
 datasource db {
   provider = "postgresql"
-  url      = env("DB_URL")
+  url      = env("DATABASE_URL")
 }
 
 generator client {
   provider = "prisma-client-js"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  COMPLETED
 }
 
 model User {
@@ -12,14 +24,28 @@ model User {
   email        String        @unique
   name         String?
   password     String
-  role         String        @default("USER")
+  role         UserRole      @default(USER)
   createdAt    DateTime      @default(now())
   reservations Reservation[]
 }
 
+model Product {
+  id              Int           @id @default(autoincrement())
+  name            String
+  description     String?
+  imageUrl        String?
+  category        String?
+  priceCents      Int
+  durationMinutes Int?
+  stock           Int?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  reservations    Reservation[] @relation("ProductsOnReservations")
+}
+
 model Reservation {
-  id                    Int      @id @default(autoincrement())
-  user                  User     @relation(fields: [userId], references: [id])
+  id                    Int               @id @default(autoincrement())
+  user                  User              @relation(fields: [userId], references: [id])
   userId                Int
   nomClient             String?
   emailClient           String?
@@ -27,7 +53,11 @@ model Reservation {
   surface               Int?
   distanceKm            Float?
   amountCents           Int
-  status                String   @default("PENDING")
+  status                ReservationStatus @default(PENDING)
   stripePaymentIntentId String?
-  createdAt             DateTime @default(now())
+  scheduledAt           DateTime?
+  notes                 String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  products              Product[]         @relation("ProductsOnReservations")
 }
