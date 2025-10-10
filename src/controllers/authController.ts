@@ -7,30 +7,45 @@ import { asyncHandler } from "../middlewares/asyncHandler";
 const getValidRole = (role: any) => (role === "ADMIN" ? "ADMIN" : "USER");
 
 export const register = asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, password, role } = req.body;
+  try {
+    const { name, email, password, role } = req.body;
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser)
-    return res
-      .status(400)
-      .json({ success: false, message: "Email déjà utilisé" });
+    // Vérifier si l’utilisateur existe déjà
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser)
+      return res
+        .status(400)
+        .json({ success: false, message: "Email déjà utilisé" });
 
-  if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(password))
-    return res
-      .status(400)
-      .json({ success: false, message: "Mot de passe trop faible" });
+    // Vérifier la complexité du mot de passe
+    if (!/^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(password))
+      return res
+        .status(400)
+        .json({ success: false, message: "Mot de passe trop faible" });
 
-  const hashedPassword = await hashPassword(password);
-  const user = await prisma.user.create({
-    data: { name, email, password: hashedPassword, role: getValidRole(role) },
-  });
+    // Hasher le mot de passe
+    const hashedPassword = await hashPassword(password);
 
-  const token = generateJWT(user.id.toString());
-  const { password: _, ...userWithoutPassword } = user;
+    // Créer l’utilisateur
+    const user = await prisma.user.create({
+      data: { name, email, password: hashedPassword, role: getValidRole(role) },
+    });
 
-  res
-    .status(201)
-    .json({ success: true, data: { user: userWithoutPassword, token } });
+    // Générer le token
+    const token = generateJWT(user.id);
+
+    // Supprimer le mot de passe de la réponse
+    const { password: _, ...userWithoutPassword } = user;
+
+    res
+      .status(201)
+      .json({ success: true, data: { user: userWithoutPassword, token } });
+  } catch (err) {
+    console.error("Erreur inscription:", err); // <-- log complet pour debug
+    res
+      .status(500)
+      .json({ success: false, message: "Erreur interne", data: null });
+  }
 });
 
 export const login = asyncHandler(async (req: Request, res: Response) => {
@@ -47,7 +62,7 @@ export const login = asyncHandler(async (req: Request, res: Response) => {
       .status(400)
       .json({ success: false, message: "Mot de passe incorrect" });
 
-  const token = generateJWT(user.id.toString());
+  const token = generateJWT(user.id);
   const { password: _, ...userWithoutPassword } = user;
 
   res.json({ success: true, data: { user: userWithoutPassword, token } });

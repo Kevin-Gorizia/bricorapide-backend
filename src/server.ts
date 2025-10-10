@@ -14,7 +14,11 @@ import stripeRoutes from "./routes/stripeRoute";
 // Middlewares
 import { errorHandler } from "./middlewares/errorHandler";
 
+// Charger les variables d'environnement
 dotenv.config();
+
+// Vérifier que la variable Stripe est bien chargée
+console.log("Stripe key:", process.env.STRIPE_SECRET_KEY);
 
 if (!process.env.JWT_SECRET) {
   console.error("⚠️ JWT_SECRET manquant dans .env");
